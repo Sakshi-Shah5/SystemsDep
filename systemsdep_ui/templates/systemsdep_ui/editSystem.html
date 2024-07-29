@@ -1,0 +1,99 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Edit System</title>
+        {% load static %}
+        <link rel="stylesheet" href="{% static 'systemsdep_ui/style.css' %}"> 
+
+    
+
+    </head>
+    <body>
+        <header>
+            <h1>Edit System</h1>
+        </header>
+        <div>
+            <input type="text" id="editSystemInput" placeholder="Edit System Details">
+
+            <input list="systemNames" id="searchSystemInput" placeholder="Search Systems" oninput="filterSystems()">
+            <datalist id="systemNames">
+                {% for system in all_systems %}
+                <option value="{{ system.name }}" data-id="{{ system.id }}">{{ system.name }}</option>
+                {% endfor %}
+            </datalist>
+
+            <button id="editDepButton" onclick="editSystem()">Edit System</button>
+
+        </div>
+
+    <script>
+
+    function editSystem() {
+                const editedSystemName = document.getElementById("editSystemInput").value;
+                const searchInput = document.getElementById("searchSystemInput");
+                const dataList = document.getElementById("systemNames");
+                const options = dataList.options;
+                let currentSystemId = null;
+
+                // Find the option that matches the input value and get the data-id
+                for (const option of options) {
+                    if (option.value === searchInput.value) {
+                        currentSystemId = option.getAttribute('data-id');
+                        break;
+                    }
+                }
+
+                // If a matching system is found, proceed with the edit
+                if (currentSystemId) {
+                    fetch("/systemsdep-ui/edit-system/", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": "{{ csrf_token }}",
+                        },
+                        body: JSON.stringify({ edited_system_name: editedSystemName, existing_system_id: currentSystemId }),
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // System edited successfully, update the visualization
+                                data = data.updated_data;
+                                alert("System ", data, " edited successfully");
+                                visualizeData();
+                            } else {
+                                console.error("Error editing system:", data.error);
+                            }
+                        })
+                        .catch(error => console.error("Error editing system:", error));
+                } else {
+                    alert("System not found. Please select a valid system from the list.");
+                }
+            }
+
+            function filterSystems() {
+                var allSystems = {{ all_systems|safe }};
+                const input = document.getElementById("searchSystemInput");
+                const filter = input.value.toUpperCase();
+                const dataList = document.getElementById("systemNames");
+
+                // Assuming `allSystems` is an array of system objects available in the client-side
+                // This could be populated on page load or through an AJAX call
+                const filteredSystems = allSystems.filter(system => system.name.toUpperCase().includes(filter));
+
+                // Clear existing options
+                dataList.innerHTML = '';
+
+                // Add filtered options
+                filteredSystems.forEach(system => {
+                    const option = document.createElement('option');
+                    option.value = system.name;
+                    option.dataset.id = system.id; // Storing the system ID in case it's needed
+                    dataList.appendChild(option);
+                });
+            }
+
+    </script>
+    </body>
+    </html>

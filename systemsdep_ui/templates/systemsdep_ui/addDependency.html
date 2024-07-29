@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Dependency</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'systemsdep_ui/style.css' %}"> 
+</head>
+<body>
+    <header>
+        <h1>Add New Dependency</h1>
+    </header>
+    <div>
+        <input type="text" id="sourceSysInput" placeholder="Enter Source System Name">
+        <input type="text" id="destSysInput" placeholder="Enter Destination System Name">
+        <input type="text" id="dataObjInput" placeholder="Enter Data Object">
+        <input type="text" id="intTypeInput" placeholder="Enter Integration Type">
+        <button id="addDepButton" onclick="addNewDependency()">Add Dependency</button>
+    </div>
+    
+    <script>
+
+function addNewDependency() {
+            const sourceSystemName = document.getElementById("sourceSysInput").value;
+            const destinationSystemName = document.getElementById("destSysInput").value;
+            const dataObject = document.getElementById("dataObjInput").value;
+            const integrationType = document.getElementById("intTypeInput").value;
+
+            fetch("/systemsdep-ui/add-dependency/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}",
+                },
+                body: JSON.stringify({
+                    source_system_name: sourceSystemName,
+                    destination_system_name: destinationSystemName,
+                    data_object: dataObject,
+                    integration_type: integrationType
+                }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Dependency added successfully, update the visualization
+                        const updatedData = data.updated_data;
+                        const tableBody = document.getElementById("dataTable");
+                        const newRow = document.createElement("tr");
+                        newRow.innerHTML = `
+                    <td><a href="#" onclick="searchNode('${updatedData.id}')">${updatedData.id}</a></td>
+                    <td><a href="#" onclick="searchNode('${updatedData.destination}')">${updatedData.destination}</a></td>
+                    <td>${updatedData.dataObject}</td>
+                    <td>${updatedData.integrationType}</td>
+                `;
+                        tableBody.appendChild(newRow);
+                        visualizeData();
+                    } else {
+                        console.error("Error adding dependency:", data.error);
+                    }
+                })
+                .catch(error => console.error("Error adding dependency:", error));
+        }
+
+
+        
+    </script>
+</body>
+</html>

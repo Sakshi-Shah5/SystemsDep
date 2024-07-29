@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New System</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'systemsdep_ui/style.css' %}"> 
+</head>
+<body>
+    <header>
+        <h1>Add New System</h1>
+    </header>
+    <div>
+        <input type="text" id="newSystemInput" placeholder="Enter New System Name">
+        <button id="addSystemButton" onclick="addNewSystem()">Create System</button>
+    </div>
+   
+
+
+<script>
+
+
+function addNewSystem() {
+            const newSystemName = document.getElementById("newSystemInput").value;
+
+            fetch("/systemsdep-ui/add-system/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}",
+                },
+                body: JSON.stringify({ system_name: newSystemName }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const updatedData = data.updated_data;
+                        const tableBody = document.getElementById("dataTable");
+                        const newRow = document.createElement("tr");
+                        newRow.innerHTML = `
+                    <td><a href="#" onclick="searchNode('${updatedData}')">${updatedData}</a></td>
+                    <td><a href="#" onclick="searchNode('${updatedData.destination}')">--</a></td>
+                    <td> -- </td>
+                    <td> -- </td>
+                `;
+
+                        tableBody.appendChild(newRow);
+
+
+                        visualizeData();
+                    } else {
+                        console.error("Error adding system:", data.error);
+                    }
+                })
+                .catch(error => console.error("Error adding system:", error));
+        }
+
+    
+</script>
+
+
+</body>
+</html>

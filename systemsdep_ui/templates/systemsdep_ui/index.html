@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neptune Visualization with GoJS</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'systemsdep_ui/style.css' %}">
+
+    <script src="https://unpkg.com/gojs/release/go-debug.js"></script>
+</head>
+
+<body>
+    <header>
+        <h1>System Dependency Mapping</h1>
+    </header>
+
+
+    <div>
+        <a href="{% url 'add_system' %}" class="button">Add New System</a>
+        <a href="{% url 'add_dependency' %}" class="button">Add New Dependency</a>
+        <a href="{% url 'edit_system' %}" class="button">Edit System</a>
+        <a href="{% url 'delete_system' %}" class="button">Delete System</a>
+    </div>
+
+    <table id="dataTable">
+        <thead>
+            <tr>
+                <th>Source</th>
+                <th>Destination</th>
+                <th>Data Object</th>
+                <th>Integration Type</th>
+                <th>Platform Type</th>
+                <th>Implementation Type</th>
+                <th>Tech Lead</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for edge in edges %}
+            <tr>
+                <td><a href="#" onclick="searchNode('{{ edge.source }}')">{{ edge.source }}</a></td>
+                <td><a href="#" onclick="searchNode('{{ edge.destination }}')">{{ edge.destination }}</a></td>
+                <td>{{ edge.dataObject }}</td>
+                <td>{{ edge.integrationType }}</td>
+                <td>{{ edge.platformType }}</td>
+                <td>{{ edge.implementationType }}</td>
+                <td>{{ edge.techLead }}</td>
+                <td>{{ edge.description }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+
+    <div id="visualizationModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div id="loadingMessage">Please wait while the visualization is loading...</div>
+            <div id="myDiagramDiv"></div>
+        </div>
+    </div>
+
+    <script>
+        const $ = go.GraphObject.make;
+        const urlParams = new URLSearchParams(window.location.search);  // to parse the query params from the current url
+        const fetchData = JSON.parse(decodeURIComponent(urlParams.get('data')));
+
+
+        const myDiagram = $(go.Diagram, "myDiagramDiv", {
+            initialContentAlignment: go.Spot.Center,
+            layout: $(go.ForceDirectedLayout, {
+                defaultSpringLength: 150, // Increase this value to increase edge length
+                defaultElectricalCharge: 100 // Adjust this value to control node repulsion
+            }),
+            "undoManager.isEnabled": true,
+        });
+
+        // Node template
+        myDiagram.nodeTemplate = $(
+            go.Node,
+            "Auto",
+            {
+                selectable: true,
+                resizable: true,
+                portSpreading: go.Node.SpreadingPacked, // Evenly distribute ports around the node
+            },
+            $(go.Shape, "Circle", {
+                fill: "#2196F3", // Set a custom fill color for nodes
+                stroke: "#1565c0", // Set a custom stroke color for nodes
+                strokeWidth: 2,
+            }),
+            $(
+                go.TextBlock,
+                {
+                    margin: 8,
+                    stroke: "#fff", // Set text color
+                    font: "bold 12px Arial", // Set font properties
+                    editable: true, // Allow in-place editing of node labels
+                },
+                new go.Binding("text", "id")
+            ),
+            $(
+                go.TextBlock,
+                {
+                    margin: 8,
+                    stroke: "#fff", // Set text color
+                    font: "bold 12px Arial", // Set font properties
+                    editable: true, // Allow in-place editing of node labels
+                },
+                new go.Binding("text", "destination")
+            )
+        );
+
+        // Link template
+        myDiagram.linkTemplate = $(
+            go.Link,
+            {
+                routing: go.Link.Orthogonal, // Use orthogonal (right-angled) link routing
+                corner: 10, // Set the corner radius for orthogonal links
+            },
+            $(go.Shape, { strokeWidth: 4 }),
+            $(go.Shape, { toArrow: "Standard", scale: 2 }), // Larger arrowhead
+            $(
+                go.TextBlock,
+                {
+                    segmentOffset: new go.Point(0, -10), // Position above the link
+                    segmentOrientation: go.Link.OrientUpright,
+                    font: "bold 12px Arial", // Set font properties
+                },
+                new go.Binding("text", "dataObject")
+            ),
+            $(
+                go.TextBlock,
+                {
+                    segmentOffset: new go.Point(0, 10), // Position below the link
+                    segmentOrientation: go.Link.OrientUpright,
+                    font: "bold 12px Arial", // Set font properties
+                },
+                new go.Binding("text", "integrationType")
+            )
+        );
+
+        function visualizeData() {
+            const uniqueNodes = {};
+            const nodes = [];
+            const links = [];
+
+            for (const entry of fetch_data) {
+                if (!uniqueNodes[entry.id]) {
+                    uniqueNodes[entry.id] = true;
+                    nodes.push({ key: entry.id, id: entry.id });
+                }
+
+                if (!uniqueNodes[entry.destination]) {
+                    uniqueNodes[entry.destination] = true;
+                    nodes.push({ key: entry.destination, id: entry.destination });
+                }
+
+                links.push({
+                    from: entry.id,
+                    to: entry.destination,
+                    dataObject: entry.dataObject,
+                    integrationType: entry.integrationType
+
+                });
+            }
+
+            myDiagram.model = new go.GraphLinksModel(nodes, links);
+        }
+
+
+        const modal = document.getElementById("visualizationModal");
+        const closeBtn = document.getElementsByClassName("close")[0];
+
+        // event listener for close button
+        closeBtn.onclick = function() {
+                modal.style.display = "none";
+            }
+
+            //  event listener for clicking outside the modal
+            window.onclick = function(event) {
+                if (event.target == modal) {
+                    modal.style.display = "none";
+                }
+            }
+
+        function searchNode(nodeValue) {
+           
+            const loadingMessage = document.getElementById("loadingMessage");
+
+            modal.style.display = "block";
+            loadingMessage.style.display = "block";
+
+            fetch(`/systemsdep-ui/gremlin-search?node=${nodeValue}`)
+                .then(response => response.json())
+                .then(data => {
+                    fetch_data = data;
+                    visualizeData();
+                    loadingMessage.style.display = "none";
+                })
+                .catch(error => {
+                    console.error("Error fetching data:", error);
+                    loadingMessage.style.display = "none";
+                });
+      
+        }
+
+        visualizeData();
+    </script>
+</body>
+
+</html>
